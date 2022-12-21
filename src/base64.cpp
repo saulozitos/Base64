@@ -1,58 +1,68 @@
 #include "base64.h"
 
-#include <vector>
+Base64::Base64()
+    : m_base64Chars("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345"
+                    "6789+/"),
+      m_aux([this]() {
+        std::array<int, 256> T{-1};
+        for (int i = 0; i < m_base64Chars.size(); ++i) {
+          T.at(m_base64Chars[i]) = i;
+        }
+        return T;
+      }()) {}
 
-std::string Base64::encode(const std::string &msg) {
+std::string Base64::encode(const std::string &message) {
 
-  std::string out;
+  std::string msg;
+  int auxA = 0;
+  int auxB = -6;
 
-  int val = 0;
-  int valb = -6;
+  for (const auto &c : message) {
 
-  for (u_char c : msg) {
+    auxA = (auxA << 8) + c;
+    auxB += 8;
 
-    val = (val << 8) + c;
-    valb += 8;
-
-    while (valb >= 0) {
-      out.push_back(m_base64Chars[(val >> valb) & 0x3F]);
-      valb -= 6;
+    while (auxB >= 0) {
+      const auto index = (auxA >> auxB) & 0x3F;
+      const auto encodedChar = m_base64Chars[index];
+      msg.push_back(encodedChar);
+      auxB -= 6;
     }
   }
 
-  if (valb > -6)
-    out.push_back(m_base64Chars[((val << 8) >> (valb + 8)) & 0x3F]);
+  if (auxB > -6) {
+    const auto index = ((auxA << 8) >> (auxB + 8)) & 0x3F;
+    const auto encodedChar = m_base64Chars[index];
+    msg.push_back(encodedChar);
+  }
 
-  while (out.size() % 4)
-    out.push_back('=');
+  while (msg.size() % 4) {
+    msg.push_back('=');
+  }
 
-  return out;
+  return msg;
 }
 
-std::string Base64::decode(const std::string &msg) {
+std::string Base64::decode(const std::string &message) {
 
-  std::string out;
-  std::vector<int> T(256, -1);
+  std::string msg;
+  int auxA = 0;
+  int auxB = -8;
 
-  for (int i = 0; i < 64; i++) {
-    T[m_base64Chars[i]] = i;
-  }
+  for (const auto &c : message) {
 
-  int val = 0;
-  int valb = -8;
-
-  for (u_char c : msg) {
-
-    if (T[c] == -1)
+    if (m_aux.at(c) == -1)
       break;
 
-    val = (val << 6) + T[c];
-    valb += 6;
+    auxA = (auxA << 6) + m_aux.at(c);
+    auxB += 6;
 
-    if (valb >= 0) {
-      out.push_back(char((val >> valb) & 0xFF));
-      valb -= 8;
+    if (auxB >= 0) {
+      const char decodedChar = static_cast<char>((auxA >> auxB) & 0xFF);
+      msg.push_back(decodedChar);
+      auxB -= 8;
     }
   }
-  return out;
+
+  return msg;
 }
